@@ -1,5 +1,47 @@
+$script_mysql = <<-SCRIPT
+  apt-get update -y && \
+  apt-get upgrade -y && \
+  apt-get install nginx mysql-server-5.7 -y && \
+  mysql -e "create user 'phpuser'@'%' identified by 'pass';"
+SCRIPT
+
+$script_ansible = <<-SCRIPT
+  apt-get update -y && \
+  apt-get install ansible -y && \
+  ansible-playbook -i /vagrant/configs/ansible/hosts /vagrant/configs/ansible/playbook.yml
+SCRIPT
+
 Vagrant.configure("2") do |config|
   config.vm.box = "ubuntu/bionic64"
-  config.vm.network "forwarded_port", guest: 80, host: 8089
-  config.vm.network "public_network"
+  # config.vm.define "mysqldb" do |mysql|
+  #   mysql.vm.network "public_network", ip: "192.168.1.24"
+  #   mysql.vm.synced_folder "./configs", "/configs"
+  #   mysql.vm.synced_folder ".", "/vagrant", disabled: true
+  #   mysql.vm.provision "shell", inline: $script_mysql
+  #   mysql.vm.provision "shell", inline: "cat /configs/id_rsa.pub >> .ssh/authorized_keys"
+  #   mysql.vm.provision "shell", inline: "cat /configs/mysqld.cnf > /etc/mysql/mysql.conf.d/mysqld.cnf"
+  #   mysql.vm.provision "shell", inline: "service mysql restart"
+  # end
+
+  config.vm.provider "virtualbox" do |v|
+    v.memory = 512
+    v.cpus = 2
+  end
+
+  config.vm.define "mysqlserver" do |mysqlserver|
+    mysqlserver.vm.network "public_network", ip: "192.168.1.22"
+
+    mysqlserver.vm.provider "virtualbox" do |v|
+      v.memory = 1024
+      v.cpus = 2
+      v.name = "mysql_server"
+    end
+    mysqlserver.vm.provision "shell", inline: "cat /vagrant/configs/id_rsa.pub >> .ssh/authorized_keys"
+  end
+
+  config.vm.define "ansible" do |ansible|
+    ansible.vm.network "public_network", ip: "192.168.1.23"
+    ansible.vm.provision "shell", inline: "cp /vagrant/configs/id_rsa /home/vagrant && chmod 600 /home/vagrant/id_rsa && chown vagrant:vagrant id_rsa"
+    ansible.vm.provision "shell", inline: $script_ansible
+  end
 end
